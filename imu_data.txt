@@ -1,0 +1,1 @@
+Time	Angular Velocity X	Angular Velocity Y	Angular Velocity Z	Linear Acceleration X	Linear Acceleration Y	Linear Acceleration Z
