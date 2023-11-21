@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 # Specify the path to your exported data text file
-data_file = 'test3.bag_RotorSpeed.txt'
+data_file = '/home/zhangziqi/Desktop/Rosdata/Rosdata-processing/test2.bag_RotorSpeed.txt'
 
 
 # Read the data from the text file

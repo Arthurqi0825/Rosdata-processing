@@ -1,7 +1,8 @@
 import pandas as pd
 import rosbag 
 import sympy as sp 
-import numpy as np 
+import numpy as np
+from sympy import symbols, Matrix, sin, acos 
 import matplotlib.pyplot as plt
 import math
 # 1, Using List to get all Quaternion
@@ -19,8 +20,8 @@ import math
 # Read the data from the file
 
 # quaternion to Rotation matrix, for pose calculation
-def q2r(q0, q1, q2, q3):#quaternion to rotation
-    # [w,qx,qy,qz]
+def q2r(quaternion):#quaternion to rotation
+    q0, q1, q2, q3 = quaternion
 
     rotation_matrix = sp.Matrix([
         [1 - 2*q2*q2 - 2*q3*q3, 2*q1*q2 - 2*q0*q3, 2*q1*q3 + 2*q0*q2],
@@ -30,6 +31,56 @@ def q2r(q0, q1, q2, q3):#quaternion to rotation
 
     return rotation_matrix
 
+def convert_quaternions(quaternions, target_frequency, current_frequency):
+    converted_quaternions = []
+    for i in range(len(quaternions) - 1):
+        if(i< len(quaternion_240hz)-1):
+            print(i)
+
+            q1 = quaternions[i]
+            q2 = quaternions[i + 1]
+            converted_segment = slerp_interpolation(q1, q2, target_frequency, current_frequency)
+            converted_quaternions.extend(converted_segment)
+    
+    print(converted_quaternions)
+    return converted_quaternions
+
+
+
+def slerp_interpolation(q1, q2, target_frequency, current_frequency):
+    # Calculate the interpolation ratio
+    ratio = target_frequency / current_frequency
+
+    # Calculate the number of interpolated frames
+    num_frames = int(len(q1) * ratio)
+
+    # Create symbols for the quaternion components
+    t = symbols('t')
+    w1, x1, y1, z1 = symbols('w1 x1 y1 z1')
+    w2, x2, y2, z2 = symbols('w2 x2 y2 z2')
+
+    # Create symbolic quaternion expressions for Q1 and Q2
+    Q1 = Matrix([w1, x1, y1, z1])
+    Q2 = Matrix([w2, x2, y2, z2])
+
+    # Calculate the angle between Q1 and Q2
+    dot_product = Q1.dot(Q2)
+    angle = acos(dot_product)
+
+    # Perform Slerp interpolation for each frame
+    interpolated_quaternions = []
+    for i in range(num_frames):
+        t_value = i / num_frames
+
+        # Calculate the interpolation weight factors
+        weight_q1 = sin((1 - t) * angle) / sin(angle)
+        weight_q2 = sin(t * angle) / sin(angle)
+
+        # Perform Slerp interpolation
+        interpolated_quaternion = Q1 * weight_q1 + Q2 * weight_q2
+        interpolated_quaternions.append(interpolated_quaternion)
+
+    return interpolated_quaternions
 # Interpolating data 
 def interpolate_data(data, source_hz, target_hz):
     source_interval = 1.0 / source_hz
@@ -120,12 +171,22 @@ total_thrust = [kv* i for i in ri_squared]
 
 print(len(total_thrust))
 
+quaternion_240hz = []
 
-inter_qx = interpolate_data(qx,240,100)
-inter_qy = interpolate_data(qy,240,100)
-inter_qz = interpolate_data(qz,240,100)
-inter_w = interpolate_data(w,240,100)
+for i in range(len(qx)):
+    # quaternion_240hz[i] = [w[i],qx[i],qy[i],qz[i]]
+    # print([w[i],qx[i],qy[i],qz[i]])
+    quaternion_240hz.append([w[i],qx[i],qy[i],qz[i]])
+    # quaternion_240hz[i][0] = w[i]
+    # quaternion_240hz[i][1] = qx[i]
+    # quaternion_240hz[i][2] = qy[i]
+    # quaternion_240hz[i][3] = qz[i]
 
+target_frequency  = 100
+current_frequency = 240
+converted_quaternions = convert_quaternions(quaternion_240hz, target_frequency, current_frequency)
+
+print(converted_quaternions)
 # get processed imu data in 100hz, which is much easy 
 # since imu frequency is 1000hz
 imu = [[],[],[]]
@@ -147,24 +208,29 @@ while(ite <= len(ac_x)):
 
 
 # 
-mass = []
-for i in range(min(len(imu[0]),len(inter_qx),len(total_thrust))):
-    #rotation: q2r
-    R = q2r(inter_w[i],inter_qx[i],inter_qy[i],inter_qz[i])
+# mass = []
+# for i in range(min(len(imu[0]),len(inter_qx),len(total_thrust))):
+#     #rotation: q2r
+#     qua = inter_w[i],inter_qx[i],inter_qy[i],inter_qz[i]
+#     R = q2r(qua)
     
-    G = sp.Matrix([0,0,-9.81]) # [0,0,-9.81].T
-    A = sp.Matrix([imu[0][i],imu[1][i],imu[2][i]]) 
-    T = sp.Matrix([0,0,total_thrust[i]])
+#     G = sp.Matrix([0,0,-9.81]) # [0,0,-9.81].T
+#     A = sp.Matrix([imu[0][i],imu[1][i],imu[2][i]]) 
+#     T = sp.Matrix([0,0,total_thrust[i]])
 
-    Thrust = R@T
-    Acc    = R@A + G
+#     # Thrust = R@T
+#     # Acc    = R@A + G
+#     # Thrust = T
+#     # Acc    = A + G
 
-    mi = (Thrust.dot(Acc))/(Acc.dot(Acc)) 
-    mass.append(mi)
+#     mi = (total_thrust[i])/(imu[2][i])
+#     # mi = (Thrust.dot(Acc))/(Acc.dot(Acc)) 
+#     mass.append(mi)
 
 
+# timestamp = [i * 0.01 for i in range(len(mass))]
+# # print(mass)
+# plt.plot(timestamp,mass,color='b')
+# plt.scatter(timestamp,mass, s= 20,color='r')
 
-# print(mass)
-plt.plot(mass)
-
-plt.show()
+# plt.show()
