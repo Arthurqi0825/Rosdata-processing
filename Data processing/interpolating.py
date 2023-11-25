@@ -2,7 +2,7 @@ import pandas as pd
 import rosbag 
 import sympy as sp 
 import numpy as np
-from sympy import symbols, Matrix, sin, acos 
+from sympy import symbols, Matrix, sin, acos, sqrt, lambdify
 import matplotlib.pyplot as plt
 import math
 # 1, Using List to get all Quaternion
@@ -21,8 +21,14 @@ import math
 
 # quaternion to Rotation matrix, for pose calculation
 def q2r(quaternion):#quaternion to rotation
+    # quaternion = [w,x,y,z]
     q0, q1, q2, q3 = quaternion
+    q0 = float(q0)
+    q1 = float(q1)
+    q2 = float(q2)
+    q3 = float(q3)
 
+    # print(type(q0))
     rotation_matrix = sp.Matrix([
         [1 - 2*q2*q2 - 2*q3*q3, 2*q1*q2 - 2*q0*q3, 2*q1*q3 + 2*q0*q2],
         [2*q1*q2 + 2*q0*q3, 1 - 2*q1*q1 - 2*q3*q3, 2*q2*q3 - 2*q0*q1],
@@ -31,28 +37,9 @@ def q2r(quaternion):#quaternion to rotation
 
     return rotation_matrix
 
-def convert_quaternions(quaternions, target_frequency, current_frequency):
-    converted_quaternions = []
-    for i in range(len(quaternions) - 1):
-        if(i< len(quaternion_240hz)-1):
-            print(i)
-
-            q1 = quaternions[i]
-            q2 = quaternions[i + 1]
-            converted_segment = slerp_interpolation(q1, q2, target_frequency, current_frequency)
-            converted_quaternions.extend(converted_segment)
-    
-    print(converted_quaternions)
-    return converted_quaternions
-
-
-
 def slerp_interpolation(q1, q2, target_frequency, current_frequency):
     # Calculate the interpolation ratio
     ratio = target_frequency / current_frequency
-
-    # Calculate the number of interpolated frames
-    num_frames = int(len(q1) * ratio)
 
     # Create symbols for the quaternion components
     t = symbols('t')
@@ -67,41 +54,36 @@ def slerp_interpolation(q1, q2, target_frequency, current_frequency):
     dot_product = Q1.dot(Q2)
     angle = acos(dot_product)
 
-    # Perform Slerp interpolation for each frame
-    interpolated_quaternions = []
-    for i in range(num_frames):
-        t_value = i / num_frames
+    # Calculate the interpolation weight factors
+    weight_q1 = sin((1 - t) * angle) / sin(angle)
+    weight_q2 = sin(t * angle) / sin(angle)
 
-        # Calculate the interpolation weight factors
-        weight_q1 = sin((1 - t) * angle) / sin(angle)
-        weight_q2 = sin(t * angle) / sin(angle)
+    # Perform Slerp interpolation
+    interpolated_quaternion = Q1 * weight_q1 + Q2 * weight_q2
 
-        # Perform Slerp interpolation
-        interpolated_quaternion = Q1 * weight_q1 + Q2 * weight_q2
-        interpolated_quaternions.append(interpolated_quaternion)
+    # Create lambdified function for numerical evaluation
+    variables = (t, w1, x1, y1, z1, w2, x2, y2, z2)
+    interpolated_quaternion_func = lambdify(variables, interpolated_quaternion)
 
-    return interpolated_quaternions
+    return interpolated_quaternion_func
+
+def convert_quaternions(quaternions, target_frequency, current_frequency):
+    converted_quaternions = []
+    slerp_func = slerp_interpolation(None, None, target_frequency, current_frequency)
+
+    for i in range(len(quaternions) - 1):
+        q1 = quaternions[i]
+        q2 = quaternions[i + 1]
+
+        # Perform numerical evaluation of the interpolated quaternion
+        interpolated_quaternion = slerp_func(
+             i / (len(quaternions) - 1), q1[0], q1[1], q1[2], q1[3], q2[0], q2[1], q2[2], q2[3]
+        )
+
+        converted_quaternions.append(interpolated_quaternion)
+
+    return converted_quaternions
 # Interpolating data 
-def interpolate_data(data, source_hz, target_hz):
-    source_interval = 1.0 / source_hz
-    target_interval = 1.0 / target_hz
-    num_target_samples = int(len(data) * target_hz / source_hz)
-    interpolated_data = []
-
-    for i in range(num_target_samples):
-        target_time = i * target_interval
-        source_index = int(target_time / source_interval)
-        fraction = target_time % source_interval / source_interval
-
-        if source_index >= len(data) - 1:
-            interpolated_value = data[-1]
-        else:
-            interpolated_value = data[source_index] * (1 - fraction) + data[source_index + 1] * fraction
-
-        interpolated_data.append(interpolated_value)
-
-    return interpolated_data
-
 
 bag = rosbag.Bag('/home/zhangziqi/Desktop/Rosdata/Rosdata-processing/test2.bag')
 
@@ -184,9 +166,10 @@ for i in range(len(qx)):
 
 target_frequency  = 100
 current_frequency = 240
-converted_quaternions = convert_quaternions(quaternion_240hz, target_frequency, current_frequency)
+interred_quaternions = convert_quaternions(quaternion_240hz, target_frequency, current_frequency)
 
-print(converted_quaternions)
+# for i in interred_quaternions:
+#     print(i[0])
 # get processed imu data in 100hz, which is much easy 
 # since imu frequency is 1000hz
 imu = [[],[],[]]
@@ -208,29 +191,31 @@ while(ite <= len(ac_x)):
 
 
 # 
-# mass = []
-# for i in range(min(len(imu[0]),len(inter_qx),len(total_thrust))):
-#     #rotation: q2r
-#     qua = inter_w[i],inter_qx[i],inter_qy[i],inter_qz[i]
-#     R = q2r(qua)
+mass = []
+Th= []
+for i in range(min(len(imu[0]),len(interred_quaternions),len(total_thrust))):
+    #rotation: q2r
+    qua = [interred_quaternions[i][0],interred_quaternions[i][1],interred_quaternions[i][2],interred_quaternions[i][3]]
+    R = q2r(qua)
     
-#     G = sp.Matrix([0,0,-9.81]) # [0,0,-9.81].T
-#     A = sp.Matrix([imu[0][i],imu[1][i],imu[2][i]]) 
-#     T = sp.Matrix([0,0,total_thrust[i]])
+    G = sp.Matrix([0,0,-9.81]) # [0,0,-9.81].T
+    A = sp.Matrix([imu[0][i],imu[1][i],imu[2][i]]) 
+    T = sp.Matrix([0,0,total_thrust[i]])
 
-#     # Thrust = R@T
-#     # Acc    = R@A + G
-#     # Thrust = T
-#     # Acc    = A + G
-
-#     mi = (total_thrust[i])/(imu[2][i])
-#     # mi = (Thrust.dot(Acc))/(Acc.dot(Acc)) 
-#     mass.append(mi)
+    Thrust = R@T
+    Acc    = R@A
+    # Thrust = T
+    # Acc    = A + G
+    # Th.append(Thrust[2])
+    mi =  Thrust[2]/Acc[2]
+    # mi = (total_thrust[i])/(imu[2][i])
+    # mi = (Thrust.dot(Acc))/(Acc.dot(Acc)) 
+    mass.append(mi)
 
 
 # timestamp = [i * 0.01 for i in range(len(mass))]
 # # print(mass)
 # plt.plot(timestamp,mass,color='b')
 # plt.scatter(timestamp,mass, s= 20,color='r')
-
-# plt.show()
+plt.plot(mass)
+plt.show()
