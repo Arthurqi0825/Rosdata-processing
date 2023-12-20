@@ -1,9 +1,10 @@
-# Rosdata
+# Rosdata Processing
 
 ## Description
 
-Currently Matlab have existing toolbox for getting ros data from rosbag files. The repository that provides Python code for retrieving data from rosbag files. It offers a convenient alternative to using Matlab for extracting data from rosbag files.
+Currently Matlab have existing toolbox for getting ros data from rosbag files. The repository that provides Python code for retrieving data from rosbag files. It offers a convenient alternative to using Matlab for extracting data from rosbag files. So far, Rospy provides a convinient way to retrieve bag file data with ros in your system. I have not found another library to retrieve data independently.
 
+## Structure
 The Code folder includes the code can be used now for processing and Test Code is the code achieve partially functional requirement and will be moved to Code folder when its finished. 
 
 There are several .bag file in Sample with the output txt files.
@@ -19,7 +20,7 @@ There are several .bag file in Sample with the output txt files.
 
 To use Rosdata, follow these steps:
 
-1. Install ROS on your system.
+1. Install ROS on your system (You must have ROS in your system to using rospy library).
 2. Clone the Rosdata repository.
 3. Open the desired Python script for the topic you want to extract data from.
 4. Modify the script according to your specific requirements.
