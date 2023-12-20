@@ -1,15 +1,5 @@
 # Rosdata
 
-This rep is a personal experience rep on getting ros data without using Matlab, which is much convenient 
-
-This rep includes several simple python code for analysis and retrive the rosbag data to txt based on different topic. 
-
-Each of them is really simple and easy to learn and be modified.
-
-Rospy is the library majorly used and any version of ros should be installed in advance.
-
-# Rosdata
-
 ## Description
 
 Currently Matlab have existing toolbox for getting ros data from rosbag files. The repository that provides Python code for retrieving data from rosbag files. It offers a convenient alternative to using Matlab for extracting data from rosbag files.
